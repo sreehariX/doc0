@@ -1,4 +1,4 @@
-import { Book, FileCode, Blocks, Layers } from 'lucide-react';
+import { Book, FileCode, Blocks, Layers, Box } from 'lucide-react';
 import type { Framework } from '../types/chat';
 
 interface SidebarProps {
@@ -7,11 +7,41 @@ interface SidebarProps {
 }
 
 const frameworks = [
-  { id: 'react', name: 'React', icon: Blocks },
-  { id: 'angular', name: 'Angular', icon: Layers },
-  { id: 'astro', name: 'Astro', icon: FileCode },
-  { id: 'vue', name: 'Vue', icon: Book },
+  { 
+    id: 'react', 
+    name: 'React', 
+    icon: Blocks,
+    collection: 'docs_react'
+  },
+  { 
+    id: 'nextjs', 
+    name: 'Next.js', 
+    icon: Layers,
+    collection: 'docs_nextjs'
+  },
+  { 
+    id: 'astro', 
+    name: 'Astro', 
+    icon: FileCode,
+    collection: 'docs_astro'
+  },
+  { 
+    id: 'kestra', 
+    name: 'Kestra', 
+    icon: Book,
+    collection: 'docs_kestra'
+  },
+  { 
+    id: 'redux', 
+    name: 'Redux', 
+    icon: Box,
+    collection: 'docs_redux'
+  },
 ] as const;
+
+export const getCollectionName = (framework: Framework) => {
+  return frameworks.find(f => f.id === framework)?.collection || 'docs_react';
+};
 
 export function Sidebar({ selectedFramework, onFrameworkSelect }: SidebarProps) {
   return (

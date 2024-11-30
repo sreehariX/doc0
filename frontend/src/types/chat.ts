@@ -14,7 +14,7 @@ export interface ChatResponse {
   summary: string;
 }
 
-export type Framework = 'react' | 'angular' | 'astro' | 'vue';
+export type Framework = 'react' | 'nextjs' | 'astro' | 'kestra' | 'redux';
 
 export interface Message {
   role: 'user' | 'assistant';

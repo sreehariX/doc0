@@ -4,6 +4,7 @@ import { ChatMessage } from './components/ChatMessage';
 import { ChatInput } from './components/ChatInput';
 import { LoadingState } from './components/LoadingState';
 import type { Framework, Message, ChatResponse } from './types/chat';
+import { getCollectionName } from './components/Sidebar';
 
 interface FrameworkMessages {
   [key: string]: Message[];
@@ -13,9 +14,10 @@ export default function App() {
   const [framework, setFramework] = useState<Framework>('react');
   const [messagesPerFramework, setMessagesPerFramework] = useState<FrameworkMessages>({
     react: [],
-    angular: [],
+    nextjs: [],
     astro: [],
-    vue: []
+    kestra: [],
+    redux: []
   });
   const [loading, setLoading] = useState(false);
 
@@ -33,7 +35,6 @@ export default function App() {
       timestamp: new Date().toISOString(),
     };
 
-    // Update messages for current framework only
     setMessagesPerFramework(prev => ({
       ...prev,
       [framework]: [...prev[framework], userMessage]
@@ -41,27 +42,14 @@ export default function App() {
     
     setLoading(true);
 
-    if (framework !== 'astro') {
-      const assistantMessage: Message = {
-        role: 'assistant',
-        content: `Currently, we only support Astro documentation. Support for ${framework} coming soon!`,
-        timestamp: new Date().toISOString(),
-      };
-      
-      setMessagesPerFramework(prev => ({
-        ...prev,
-        [framework]: [...prev[framework], assistantMessage]
-      }));
-      
-      setLoading(false);
-      return;
-    }
-
     try {
       const response = await fetch('http://127.0.0.1:8000/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: message }),
+        body: JSON.stringify({ 
+          query: message,
+          collection_name: getCollectionName(framework)
+        }),
       });
       
       if (!response.ok) {
@@ -74,7 +62,7 @@ export default function App() {
         role: 'assistant',
         content: data.summary,
         sources: data.results.map(result => ({
-          title: result.metadata.techStackName || 'Astro Documentation',
+          title: result.metadata.techStackName || `${framework.charAt(0).toUpperCase() + framework.slice(1)} Documentation`,
           url: result.metadata.url,
         })),
         timestamp: data.timestamp,
@@ -89,15 +77,21 @@ export default function App() {
       }));
     } catch (error) {
       console.error('Failed to fetch response:', error);
-      const errorMessage: Message = {
+      
+      let errorMessage = 'Sorry, there was an error processing your request. Please check your connection and try again.';
+      if (error instanceof Error) {
+        errorMessage = `Error: ${error.message}`;
+      }
+      
+      const assistantMessage: Message = {
         role: 'assistant',
-        content: 'Sorry, there was an error processing your request. Please check your connection and try again.',
+        content: errorMessage,
         timestamp: new Date().toISOString(),
       };
       
       setMessagesPerFramework(prev => ({
         ...prev,
-        [framework]: [...prev[framework], errorMessage]
+        [framework]: [...prev[framework], assistantMessage]
       }));
     } finally {
       setLoading(false);
