@@ -4,6 +4,7 @@ import { ExternalLink, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface ChatMessageProps {
   message: Message;
@@ -48,9 +49,13 @@ function CodeBlock({ language, value }: CodeBlockProps) {
 
 export function ChatMessage({ message }: ChatMessageProps) {
   return (
-    <div className={`py-6 ${message.role === 'assistant' ? 'bg-gray-50' : ''}`}>
-      <div className="max-w-3xl mx-auto px-4">
-        <div className="prose prose-gray max-w-none">
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`py-6 ${message.role === 'assistant' ? 'bg-gray-900/30' : ''}`}
+    >
+      <div className="max-w-2xl mx-auto px-4">
+        <div className="prose prose-invert prose-pre:bg-gray-900/50 prose-pre:border prose-pre:border-gray-800/50 max-w-none">
           <ReactMarkdown
             components={{
               code({ node, inline, className, children, ...props }) {
@@ -121,6 +126,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
