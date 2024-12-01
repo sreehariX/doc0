@@ -3,7 +3,7 @@
 
 ![Screenshot 2024-12-01 231908](https://github.com/user-attachments/assets/cc3c4007-a255-45fb-a453-17fb2c7bf24e)
 
-[Website] | [Getting Started] | [Live Demo]
+[Website] | [Getting Started] | [Live Demo Video]
 </div>
 
 This is the main source code repository for doc0, an AI-powered documentation chat interface that allows users to interact with technical documentation giving accurate results.
@@ -18,7 +18,7 @@ This is the main source code repository for doc0, an AI-powered documentation ch
 
 ## Youtube demo video 
 
-https://www.youtube.com/watch?v=QgL8jfBxz9s
+[![Doc0 Demo](https://img.youtube.com/vi/QgL8jfBxz9s/maxresdefault.jpg)](https://www.youtube.com/watch?v=QgL8jfBxz9s)
 
 ## Quick Start
 
@@ -154,4 +154,4 @@ MIT License
 
 [Website]: https://doc0.vercel.app/
 [Getting Started]: #quick-start
-[Live Demo]: https://youtu.be/QgL8jfBxz9s?si=_5f9TBM6-iT-zhVb
+[Live Demo Video]: https://youtu.be/QgL8jfBxz9s?si=_5f9TBM6-iT-zhVb
