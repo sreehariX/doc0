@@ -55,7 +55,7 @@ export function ChatInput({
   const isLimitReached = !isAuthenticated && remainingRequests <= 0;
 
   return (
-    <div className={`p-4 ${centered ? '' : 'w-full'}`}>
+    <div className={`p-2 sm:p-4 ${centered ? '' : 'w-full'}`}>
       <div className="max-w-[1024px] mx-auto">
         <div className="mb-2 flex items-center justify-between text-sm">
           <div className="flex items-center gap-2">
@@ -105,10 +105,10 @@ export function ChatInput({
               onChange={(e) => setInput(e.target.value)}
               placeholder={placeholder}
               disabled={disabled}
-              className="w-full bg-gray-900 text-white rounded-2xl border border-gray-800/50 px-6 py-4 pr-24 
+              className="w-full bg-gray-900 text-white rounded-2xl border border-gray-800/50 px-4 sm:px-6 py-3 sm:py-4 pr-16 sm:pr-24 
                 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 
                 disabled:opacity-50 disabled:cursor-not-allowed
-                placeholder-gray-500"
+                placeholder-gray-500 text-sm sm:text-base"
             />
             <button
               type="submit"

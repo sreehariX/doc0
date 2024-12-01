@@ -9,13 +9,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from './store/auth';
 import { RequestLimiter } from './services/requestLimiter';
 import { LoginModal } from './components/LoginModal';
+import { Menu } from 'lucide-react';
 
 interface FrameworkMessages {
   [key: string]: Message[];
 }
 
 export default function App() {
-  const [framework, setFramework] = useState<Framework>('react');
+  const [framework, setFramework] = useState<Framework>('kestra');
   const [messagesPerFramework, setMessagesPerFramework] = useState<FrameworkMessages>({
     react: [],
     nextjs: [],
@@ -28,6 +29,7 @@ export default function App() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const { isAuthenticated } = useAuthStore();
   const latestMessageRef = useRef<HTMLDivElement>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Get current framework's messages
   const messages = messagesPerFramework[framework];
@@ -131,14 +133,32 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-950">
+    <div className="flex flex-col md:flex-row h-screen bg-gray-950">
+      {/* Mobile Header */}
+      <div className="md:hidden flex items-center px-4 h-16 border-b border-gray-800/50">
+        <button
+          onClick={() => setIsMobileMenuOpen(true)}
+          className="p-2 hover:bg-gray-800 rounded-lg"
+        >
+          <Menu className="w-6 h-6 text-gray-400" />
+        </button>
+        <div className="flex items-center ml-3 space-x-3">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-blue-400 flex items-center justify-center">
+            <img src="/logo.svg" alt="doc0 logo" className="w-5 h-5" />
+          </div>
+          <h1 className="text-lg font-bold text-white">doc0</h1>
+        </div>
+      </div>
+
       <Sidebar 
         selectedFramework={framework} 
         onFrameworkSelect={handleFrameworkChange}
         onLoginClick={handleLoginClick}
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
       />
       
-      <main className="flex-1 flex flex-col min-w-0 relative">
+      <main className="flex-1 flex flex-col min-w-0 relative h-[calc(100vh-64px)] md:h-screen">
         <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-800/50 scrollbar-track-gray-900">
           <AnimatePresence>
             {!hasInteracted ? (
@@ -184,22 +204,20 @@ export default function App() {
         </div>
         
         {hasInteracted && (
-          <>
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="absolute bottom-6 left-0 right-0 px-4"
-            >
-              <div className="max-w-3xl mx-auto">
-                <ChatInput 
-                  onSend={handleSend} 
-                  disabled={loading}
-                  placeholder={`Ask about ${framework}...`}
-                  onLoginClick={handleLoginClick}
-                />
-              </div>
-            </motion.div>
-          </>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="absolute bottom-0 left-0 right-0 px-2 sm:px-4 pb-2 sm:pb-6"
+          >
+            <div className="max-w-3xl mx-auto">
+              <ChatInput 
+                onSend={handleSend} 
+                disabled={loading}
+                placeholder={`Ask about ${framework}...`}
+                onLoginClick={handleLoginClick}
+              />
+            </div>
+          </motion.div>
         )}
       </main>
 

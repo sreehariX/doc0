@@ -52,11 +52,13 @@ export function ChatMessage({ message }: ChatMessageProps) {
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="py-6"
+      className="py-3 sm:py-6"
     >
-      <div className="max-w-2xl mx-auto px-4">
+      <div className="max-w-2xl mx-auto px-2 sm:px-4">
         <div className={`prose prose-invert prose-pre:bg-gray-900/50 prose-pre:border prose-pre:border-gray-800/50 max-w-none
-          ${message.role === 'user' ? 'inline-block p-4 bg-gray-800/40 rounded-xl border border-gray-700/50' : ''}`}>
+          prose-p:text-sm sm:prose-p:text-base
+          prose-headings:text-base sm:prose-headings:text-lg
+          ${message.role === 'user' ? 'inline-block p-3 sm:p-4 bg-gray-800/40 rounded-xl border border-gray-700/50' : ''}`}>
           <ReactMarkdown
             components={{
               a: ({ node, children, href, ...props }) => (
