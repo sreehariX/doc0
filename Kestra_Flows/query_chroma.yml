@@ -1,0 +1,102 @@
+
+# not in production moved to fastapi this yaml only just because kestra does not meant to be used as webserver so did not make sense so for production exact same code shifted for fastapi
+
+
+id: doc_query_api_flow
+namespace: documentation
+
+inputs:
+  - id: user
+    type: STRING
+    required: true
+    defaults: What is astro island
+
+tasks:
+  - id: build
+    type: io.kestra.plugin.docker.Build
+    dockerfile: |
+      FROM python:3.10
+      RUN pip install chromadb
+      RUN pip install google-generativeai
+    tags:
+      - python_image
+
+  - id: code
+    type: io.kestra.plugin.scripts.python.Script
+    taskRunner:
+      type: io.kestra.plugin.scripts.runner.docker.Docker
+      pullPolicy: NEVER
+    containerImage: "{{ outputs.build.imageId }}"
+    outputFiles:
+      - output.json  
+    script: |
+      import chromadb
+      import google.generativeai as genai
+      from datetime import datetime
+      import json
+      
+      genai.configure(api_key='{{ kv('google_api_key') }}')  
+      chroma_client = chromadb.HttpClient(
+          host="{{ kv('chroma_host') }}",
+          port=8000
+      )
+      
+      def get_embedding(text):
+          result = genai.embed_content(
+              model='models/text-embedding-004',
+              content=text
+          )
+          return result['embedding']
+      
+      def get_gemini_summary(documents, sources):
+          model = genai.GenerativeModel('gemini-1.5-pro')
+          prompt = f"Summarize these docs:\n{documents}\nSources:{sources}"
+          response = model.generate_content(prompt)
+          return response.text
+      
+      def process_query(query):
+          print(f"Processing query: {query}")
+          
+          collection = chroma_client.get_collection("astro_docs")
+          query_embedding = get_embedding(query)
+          
+          results = collection.query(
+              query_embeddings=[query_embedding],
+              n_results=3,
+              include=['documents', 'metadatas', 'distances']
+          )
+          
+          formatted_results = []
+          for i in range(len(results['documents'][0])):
+              result = {
+                  'document': results['documents'][0][i],
+                  'metadata': results['metadatas'][0][i],
+                  'similarity_score': 1 - results['distances'][0][i]
+              }
+              formatted_results.append(result)
+          
+          documents = [r['document'] for r in formatted_results]
+          sources = [r['metadata'].get('url', 'No source') for r in formatted_results]
+          summary = get_gemini_summary(documents, sources)
+          
+          return {
+              'query': query,
+              'timestamp': datetime.now().isoformat(),
+              'results': formatted_results,
+              'summary': summary
+          }
+
+      
+      astro_query = "{{ inputs.user }}"
+      astro_results = process_query(astro_query)
+
+      
+      with open('output.json', 'w') as f:
+          json.dump(astro_results, f, indent=2)
+      
+      print(f"Query processed successfully.")
+
+outputs:
+  - id: output_file
+    type: STRING
+    value: "{{ outputs.code.outputFiles['output.json'] }}"  

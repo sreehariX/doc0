@@ -1,0 +1,316 @@
+#used in production main flow for this project
+
+id: chromadb
+namespace: hackathon
+
+
+variables:
+  blob_uri: "{{ trigger.blobs[0].uri }}"
+  blob_name: "{{ trigger.blobs[0].name }}"
+
+tasks:
+  - id: hello_world
+    type: io.kestra.plugin.core.log.Log
+    message: Hello World!  
+
+  - id: build
+    type: io.kestra.plugin.docker.Build
+    dockerfile: |
+      FROM python:3.10
+      RUN pip install chromadb
+      RUN pip install google-generativeai
+      RUN pip install pandas
+      RUN pip install tiktoken
+      RUN pip install azure-storage-blob
+    tags:
+      - python_image
+
+  - id: code
+    type: io.kestra.plugin.scripts.python.Script
+    namespaceFiles:
+      enabled: true
+    taskRunner:
+      type: io.kestra.plugin.scripts.runner.docker.Docker
+      pullPolicy: NEVER
+    containerImage: "{{ outputs.build.imageId }}"
+    script: |
+      import sys
+      import pandas as pd
+      import chromadb
+      import google.generativeai as genai
+      import os
+      from typing import List, Dict
+      import tiktoken
+      import json
+
+      from azure.storage.blob import BlobServiceClient
+
+      # Get the URI and name from the environment variables
+      blob_name = "{{ vars.blob_name }}"
+
+      filename = blob_name
+      
+      collection_name = filename.rsplit('.', 1)[0]  
+
+      print(collection_name)
+
+      print(f"Processing blob  Name: {blob_name}")
+
+      genai.configure(api_key="{{ kv('google_api_key') }}")
+
+      chroma_client = chromadb.HttpClient(
+          host=""{{ kv('chroma_host') }}"",
+          port=8000
+      )
+
+      def download_blob_from_azure_and_load_csv():
+          #connecting string blob ->newtowrking -> api keys
+          connection_string = "{{ kv('connecting_string') }}" 
+          blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+
+          container_name = "doc0container"  
+          blob_address = f"archive/completedcsvs/{blob_name}" 
+          print(blob_address) 
+          local_file_path = f"/tmp/{collection_name}.csv"  
+
+          try:
+              blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_address)
+
+              # Download the blob's contents to a local file -> to use for chromadb
+              with open(local_file_path, "wb") as download_file:
+                  download_file.write(blob_client.download_blob().readall())
+
+              print(f"Downloaded {blob_address} to {local_file_path}")
+
+              return local_file_path 
+          except Exception as e:
+              print(f"Error downloading blob: {e}")
+              return None
+
+      def chunk_text(text: str, chunk_size: int = 1024) -> List[str]:
+          """Split text into chunks of approximately chunk_size tokens."""
+          print(f"\n=== Starting text chunking ===")
+          print(f"Original text length: {len(text)} characters")
+
+          encoding = tiktoken.get_encoding("cl100k_base")
+          tokens = encoding.encode(text)
+          print(f"Token count: {len(tokens)} tokens")
+
+          chunks = []
+
+          for i in range(0, len(tokens), chunk_size):
+              chunk_tokens = tokens[i:i + chunk_size]
+              chunk_text = encoding.decode(chunk_tokens)
+              chunk_bytes = len(chunk_text.encode('utf-8'))
+              print(f"\nProcessing chunk {len(chunks) + 1}:")
+              print(f"Chunk size: {chunk_bytes} bytes")
+
+              if chunk_bytes > 9000:
+                  print(f"Chunk too large ({chunk_bytes} bytes), splitting in half...")
+                  mid = len(chunk_text) // 2
+                  chunks.extend([chunk_text[:mid], chunk_text[mid:]])
+                  print(f"Split into 2 chunks of {len(chunk_text[:mid])} and {len(chunk_text[mid:])} characters")
+              else:
+                  chunks.append(chunk_text)
+                  print(f"Chunk added with {len(chunk_text)} characters")
+
+          print(f"\nTotal chunks created: {len(chunks)}")
+          return chunks
+
+      def get_embedding(text: str) -> List[float]:
+          """Get embeddings using Gemini's text-embedding-004 model."""
+          try:
+              print(f"\n=== Getting embedding ===")
+              text = text.strip()
+              text_bytes = len(text.encode('utf-8'))
+              print(f"Text length: {len(text)} characters, {text_bytes} bytes")
+
+              if not text:
+                  print("Warning: Empty text, skipping embedding")
+                  return None
+
+              if text_bytes > 9000:
+                  print(f"Warning: Text too large ({text_bytes} bytes), may fail")
+
+              print("Calling Gemini API...")
+              result = genai.embed_content(
+                  model="models/text-embedding-004",
+                  content=text
+              )
+              print(f"Successfully got embedding of length: {len(result['embedding'])}")
+              return result['embedding']
+          except Exception as e:
+              print(f" Error getting embedding: {e}")
+              print(f"Text preview: {text[:100]}...")
+              print(f"Text length: {len(text.encode('utf-8'))} bytes")
+              return None
+
+      def process_csv_to_chroma(csv_path: str):
+          """Process CSV file and store embeddings in ChromaDB."""
+          print(f"\n====== Starting CSV Processing ======")
+          print(f"Reading CSV from: {csv_path}")
+
+          collection = chroma_client.get_or_create_collection(
+              name=collection_name,
+              metadata={"hnsw:space": "cosine"}
+          )
+          print(f"Connected to ChromaDB collection: {collection.name}")
+
+          # Read CSV
+          df = pd.read_csv(csv_path)
+          print(f"CSV loaded with {len(df)} rows")
+
+          documents = []
+          embeddings = []
+          metadatas = []
+          ids = []
+          id_counter = 0
+          successful_chunks = 0
+          failed_chunks = 0
+
+          for index, row in df.iterrows():
+              print(f"\n--- Processing row {index + 1}/{len(df)} ---")
+              print(f"URL: {row['url']}")
+
+              # Remove triple quotes from content
+              content = row['content'].strip('"""')
+              print(f"Content length: {len(content)} characters")
+
+              # Chunk the content
+              chunks = chunk_text(content)
+              print(f"Created {len(chunks)} chunks")
+
+              # Process each chunk
+              for chunk_idx, chunk in enumerate(chunks):
+                  try:
+                      print(f"\nProcessing chunk {chunk_idx + 1}/{len(chunks)}")
+
+                      # Get embedding from gemini
+                      embedding = get_embedding(chunk)
+                      if embedding is None:
+                          print(" Skipping chunk due to embedding failure")
+                          failed_chunks += 1
+                          continue
+
+                      # Prepare metadata
+                      metadata = {
+                          'url': row['url'],
+                          'token_count': int(row['token_count']),
+                          'char_count': int(row['char_count']),
+                          'techStackName': row['techStackName']
+                      }
+
+                      # Add to lists
+                      documents.append(chunk)
+                      embeddings.append(embedding)
+                      metadatas.append(metadata)
+                      ids.append(f"doc_{id_counter}")
+
+                      id_counter += 1
+                      successful_chunks += 1
+                      print(f" Successfully processed chunk {chunk_idx + 1}")
+
+                  except Exception as e:
+                      print(f" Error processing chunk: {e}")
+                      failed_chunks += 1
+                      continue
+
+          print("\n====== Processing Summary ======")
+          print(f"Total chunks processed: {successful_chunks + failed_chunks}")
+          print(f"Successful chunks: {successful_chunks}")
+          print(f"Failed chunks: {failed_chunks}")
+
+          # Upsert to ChromaDB
+          print("\nUpserting to ChromaDB...")
+          collection.upsert(
+              documents=documents,
+              embeddings=embeddings,
+              metadatas=metadatas,
+              ids=ids
+          )
+          print(" Successfully upserted to ChromaDB")
+
+          return chroma_client
+
+      def query_docs(query: str, n_results: int = 3) -> str:
+          """Query the ChromaDB and return top results in JSON format."""
+          print(f"\n====== Processing Query ======")
+          print(f"Query: {query}")
+
+          collection = chroma_client.get_collection(collection_name)
+          print("Connected to ChromaDB collection")
+
+          # Get query embedding just for quick testing not really needed 
+          print("Getting query embedding...")
+          query_embedding = get_embedding(query)
+
+          if query_embedding is None:
+              print(" Failed to get query embedding")
+              return json.dumps({"error": "Failed to process query"})
+
+          # Query the collection
+          print(f"Querying collection for top {n_results} results...")
+          results = collection.query(
+              query_embeddings=[query_embedding],
+              n_results=n_results,
+              include=['documents', 'metadatas', 'distances']
+          )
+
+          # Format results
+          print("Formatting results...")
+          formatted_results = []
+          for i in range(len(results['documents'][0])):
+              similarity = 1 - results['distances'][0][i]
+              result = {
+                  'document': results['documents'][0][i],
+                  'metadata': results['metadatas'][0][i],
+                  'similarity_score': similarity
+              }
+              formatted_results.append(result)
+              print(f"Result {i+1} similarity score: {similarity:.4f}")
+
+          print(" Query processing complete")
+          return json.dumps(formatted_results, indent=2)
+
+      # Quick test:
+      if __name__ == "__main__":
+          print("\n Starting embedding processor...")
+
+          csv_file_path = download_blob_from_azure_and_load_csv()
+          if csv_file_path:
+            print("\nProcessing CSV file...")
+            client = process_csv_to_chroma(csv_file_path)
+
+            # test query
+            print("\nTesting with example query...")
+            query = "What is this framework and why is it so popular"
+            results = query_docs(query)
+            print(f"\nQuery Results:")
+            print(results)
+          else:
+            print("Something went wrong, please check it out.")
+
+
+          print("\nEverything is fine, no issues. Kestra took care.")
+
+          
+
+           
+
+
+
+triggers:
+  - id: watch
+    type: io.kestra.plugin.azure.storage.blob.Trigger
+    interval: PT1S
+    endpoint: https://doc0storage.blob.core.windows.net
+    connectionString: "{{ kv('connecting_string') }}" 
+    container: doc0container
+    prefix: docs
+    action: MOVE
+    moveTo:
+      container: doc0container
+      name: archive/completedcsvs/
+    
+    
+      
