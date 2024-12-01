@@ -1,0 +1,7 @@
+
+pandas
+chromadb
+fastapi
+uvicorn
+tiktoken
+google-generativeai
