@@ -118,7 +118,14 @@ This is the main source code repository for doc0, an AI-powered documentation ch
 
 - Kestra is hosted on azure vm 16gb 2vcpu  using docker
 - Chromadb is also hosted on azure vm 16gb 2vcpu  using docker
-- Fastapi is hosted on azure vm 8gb 2vcpu using apache server for configuration 
+- Fastapi is hosted on azure vm 8gb 2vcpu using apache server for configuration
+
+
+## Kestra 
+
+- By using kestra we are automating the vectore embedding proecess
+- Whenever i upload a file in azure blob storage it will trigger kestra to run a flow
+- The flow execution will connect to chromadb server and make the chromadb embedded collection of the csv file
 
 ## Documentation Scraping
 
