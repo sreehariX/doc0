@@ -4,7 +4,7 @@ import { ExternalLink, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence} from 'framer-motion';
 
 interface ChatMessageProps {
   message: Message;
@@ -52,12 +52,23 @@ export function ChatMessage({ message }: ChatMessageProps) {
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`py-6 ${message.role === 'assistant' ? 'bg-gray-900/30' : ''}`}
+      className="py-6"
     >
       <div className="max-w-2xl mx-auto px-4">
-        <div className="prose prose-invert prose-pre:bg-gray-900/50 prose-pre:border prose-pre:border-gray-800/50 max-w-none">
+        <div className={`prose prose-invert prose-pre:bg-gray-900/50 prose-pre:border prose-pre:border-gray-800/50 max-w-none
+          ${message.role === 'user' ? 'inline-block p-4 bg-gray-800/40 rounded-xl border border-gray-700/50' : ''}`}>
           <ReactMarkdown
             components={{
+              a: ({ node, children, href, ...props }) => (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  {...props}
+                >
+                  {children}
+                </a>
+              ),
               code({ node, inline, className, children, ...props }) {
                 const match = /language-(\w+)/.exec(className || '');
                 return !inline && match ? (
@@ -73,7 +84,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
               },
             }}
           >
-            {message.content}
+            {message.content.replace(/Source Links:[\s\S]*$/, '')}
           </ReactMarkdown>
 
           {message.codeBlocks && message.codeBlocks.length > 0 && (
@@ -105,8 +116,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
           )}
           
           {message.sources && message.sources.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <p className="text-sm font-medium text-gray-500">Sources:</p>
+            <div className="mt-4 pt-4 border-t border-gray-800/50">
+              <p className="text-sm font-medium text-gray-400">Sources:</p>
               <ul className="mt-2 space-y-1">
                 {Array.from(new Set(message.sources.map(source => source.url))).map((url, index) => (
                   <li key={index} className="flex items-center space-x-2">
@@ -115,7 +126,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
                       href={url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-blue-600 hover:text-blue-800 break-all"
+                      className="text-sm text-blue-400 hover:text-blue-300 break-all"
                     >
                       {url}
                     </a>

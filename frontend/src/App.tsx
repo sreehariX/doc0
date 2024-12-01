@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ChatMessage } from './components/ChatMessage';
 import { ChatInput } from './components/ChatInput';
@@ -6,6 +6,9 @@ import { LoadingState } from './components/LoadingState';
 import type { Framework, Message, ChatResponse } from './types/chat';
 import { getCollectionName } from './components/Sidebar';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuthStore } from './store/auth';
+import { RequestLimiter } from './services/requestLimiter';
+import { LoginModal } from './components/LoginModal';
 
 interface FrameworkMessages {
   [key: string]: Message[];
@@ -22,6 +25,9 @@ export default function App() {
   });
   const [loading, setLoading] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const { isAuthenticated } = useAuthStore();
+  const latestMessageRef = useRef<HTMLDivElement>(null);
 
   // Get current framework's messages
   const messages = messagesPerFramework[framework];
@@ -30,7 +36,22 @@ export default function App() {
     setFramework(newFramework);
   };
 
+  const scrollToLatestMessage = () => {
+    latestMessageRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   const handleSend = async (message: string) => {
+    const remainingRequests = RequestLimiter.getRemainingRequests();
+    
+    if (remainingRequests <= 0 && !isAuthenticated) {
+      setShowLoginModal(true);
+      return;
+    }
+
+    if (!isAuthenticated) {
+      RequestLimiter.decrementCount();
+    }
+
     if (!hasInteracted) setHasInteracted(true);
     const userMessage: Message = {
       role: 'user',
@@ -43,10 +64,13 @@ export default function App() {
       [framework]: [...prev[framework], userMessage]
     }));
     
+    // Scroll after adding user message
+    setTimeout(scrollToLatestMessage, 100);
+    
     setLoading(true);
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/query', {
+      const response = await fetch('https://doc0fastapi.centralindia.cloudapp.azure.com/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -101,11 +125,17 @@ export default function App() {
     }
   };
 
+  const handleLoginClick = () => {
+    console.log('Login clicked'); // Debug log
+    setShowLoginModal(true);
+  };
+
   return (
     <div className="flex h-screen bg-gray-950">
       <Sidebar 
         selectedFramework={framework} 
         onFrameworkSelect={handleFrameworkChange}
+        onLoginClick={handleLoginClick}
       />
       
       <main className="flex-1 flex flex-col min-w-0 relative">
@@ -131,6 +161,7 @@ export default function App() {
                       disabled={loading}
                       placeholder={`Ask about ${framework}...`}
                       centered={true}
+                      onLoginClick={handleLoginClick}
                     />
                   </div>
                 </div>
@@ -142,7 +173,9 @@ export default function App() {
                 className="pb-24"
               >
                 {messages.map((message, index) => (
-                  <ChatMessage key={index} message={message} />
+                  <div key={index} ref={index === messages.length - 1 ? latestMessageRef : null}>
+                    <ChatMessage message={message} />
+                  </div>
                 ))}
                 {loading && <LoadingState />}
               </motion.div>
@@ -151,19 +184,28 @@ export default function App() {
         </div>
         
         {hasInteracted && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="absolute bottom-0 left-0 right-0 bg-gray-900/90 backdrop-blur-xl border-t border-gray-800/50"
-          >
-            <ChatInput 
-              onSend={handleSend} 
-              disabled={loading}
-              placeholder={`Ask about ${framework}...`}
-            />
-          </motion.div>
+          <>
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="absolute bottom-6 left-0 right-0 px-4"
+            >
+              <div className="max-w-3xl mx-auto">
+                <ChatInput 
+                  onSend={handleSend} 
+                  disabled={loading}
+                  placeholder={`Ask about ${framework}...`}
+                  onLoginClick={handleLoginClick}
+                />
+              </div>
+            </motion.div>
+          </>
         )}
       </main>
+
+      {showLoginModal && (
+        <LoginModal onClose={() => setShowLoginModal(false)} />
+      )}
     </div>
   );
 }

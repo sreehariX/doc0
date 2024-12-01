@@ -1,19 +1,26 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import type { Framework } from '../types/chat';
-
+import { ChevronLeft, ChevronRight, LogIn, LogOut } from 'lucide-react';
+import { useAuthStore } from '../store/auth';
+import { cn } from '../lib/utils';
 interface SidebarProps {
   selectedFramework: Framework;
   onFrameworkSelect: (framework: Framework) => void;
+  onLoginClick: () => void;
 }
 
 const frameworks = [
   { 
-    id: 'react', 
-    name: 'React',
-    logo: '/logos/react.png',
-    collection: 'docs_react',
+    id: 'kestra', 
+    name: 'Kestra',
+    logo: '/logos/kestra.png',
+    collection: 'docs_kestra',
   },
+
+
+
+  
   { 
     id: 'nextjs', 
     name: 'Next.js',
@@ -27,17 +34,19 @@ const frameworks = [
     logo: '/logos/astro.jpg',
     collection: 'docs_astro',
   },
-  { 
-    id: 'kestra', 
-    name: 'Kestra',
-    logo: '/logos/kestra.png',
-    collection: 'docs_kestra',
-  },
+  
   { 
     id: 'redux', 
     name: 'Redux',
     logo: '/logos/redux.png',
     collection: 'docs_redux',
+  },
+
+  { 
+    id: 'react', 
+    name: 'React',
+    logo: '/logos/react.png',
+    collection: 'docs_react',
   },
 ] as const;
 
@@ -45,8 +54,9 @@ export const getCollectionName = (framework: Framework) => {
   return frameworks.find(f => f.id === framework)?.collection || 'docs_react';
 };
 
-export function Sidebar({ selectedFramework, onFrameworkSelect }: SidebarProps) {
+export function Sidebar({ selectedFramework, onFrameworkSelect, onLoginClick }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { user, isAuthenticated, logout } = useAuthStore();
 
   return (
     <motion.div 
@@ -54,6 +64,17 @@ export function Sidebar({ selectedFramework, onFrameworkSelect }: SidebarProps) 
       animate={{ width: isCollapsed ? '72px' : '240px' }}
       className="relative h-screen bg-gray-950 border-r border-gray-800/50 flex flex-col"
     >
+      <button
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className="absolute -right-3 top-6 w-6 h-6 bg-gray-800 border border-gray-700 rounded-full flex items-center justify-center hover:bg-gray-700 transition-colors z-50"
+      >
+        {isCollapsed ? (
+          <ChevronRight className="w-4 h-4 text-gray-400" />
+        ) : (
+          <ChevronLeft className="w-4 h-4 text-gray-400" />
+        )}
+      </button>
+
       {/* Header with branding */}
       <div className="p-4 border-b border-white/10">
         <motion.div
@@ -61,12 +82,16 @@ export function Sidebar({ selectedFramework, onFrameworkSelect }: SidebarProps) 
           className="flex items-center space-x-3"
         >
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-blue-400 flex items-center justify-center shadow-lg">
-            <span className="text-white font-bold text-lg">d0</span>
+            <img 
+              src="/logo.svg" 
+              alt="doc0 logo"
+              className="w-5 h-5 object-contain"
+            />
           </div>
           {!isCollapsed && (
             <div>
               <h1 className="text-lg font-bold text-white">doc0</h1>
-              <p className="text-xs text-white/50">Documentation Chat</p>
+              <p className="text-xs text-white/50">Chat with docs</p>
             </div>
           )}
         </motion.div>
@@ -110,6 +135,44 @@ export function Sidebar({ selectedFramework, onFrameworkSelect }: SidebarProps) 
           </button>
         ))}
       </nav>
+
+      {/* Add user section at bottom */}
+      <div className="mt-auto border-t border-gray-800/50 p-4">
+        {isAuthenticated && user ? (
+          <div className="flex items-center space-x-3">
+            {user.picture && (
+              <img 
+                src={user.picture} 
+                alt={user.name}
+                className="w-8 h-8 rounded-full"
+              />
+            )}
+            {!isCollapsed && (
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white truncate">{user.name}</p>
+                <p className="text-xs text-gray-400 truncate">{user.email}</p>
+              </div>
+            )}
+            <button
+              onClick={logout}
+              className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+              title="Logout"
+            >
+              <LogOut className="w-4 h-4 text-gray-400" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={onLoginClick}
+            className="w-full flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-gray-800/20 transition-colors"
+          >
+            <LogIn className="w-4 h-4 text-gray-400" />
+            {!isCollapsed && (
+              <span className="text-sm text-gray-400">Login</span>
+            )}
+          </button>
+        )}
+      </div>
     </motion.div>
   );
 }

@@ -25,3 +25,6 @@ dist-ssr
 
 # Zone Identifier files
 *.Identifier
+
+*.env
+*.env.local
