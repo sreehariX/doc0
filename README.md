@@ -15,6 +15,11 @@ This is the main source code repository for doc0, an AI-powered documentation ch
 - **Accurate results:** Give accurate results with latest documentation including source links 
 - **Authentication** Google OAuth integration with request limiting for free users
 
+
+## Youtube demo video 
+
+https://www.youtube.com/watch?v=QgL8jfBxz9s
+
 ## Quick Start
 
 1. Clone the repository
@@ -123,10 +128,11 @@ This is the main source code repository for doc0, an AI-powered documentation ch
 
 ## Kestra 
 
+
 - By using kestra we are automating the vectore embedding proecess
 - Whenever i upload a file in azure blob storage it will trigger kestra to run a flow
 - The flow execution will connect to chromadb server and make the chromadb embedded collection of the csv file
-
+![Screenshot 2024-12-01 233229](https://github.com/user-attachments/assets/cdce15b6-2b32-4861-874f-0c45849e8e0e)
 ## Documentation Scraping
 
 The project includes custom scrapers for:
