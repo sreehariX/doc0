@@ -124,6 +124,7 @@ This is the main source code repository for doc0, an AI-powered documentation ch
 - Kestra is hosted on azure vm 16gb 2vcpu  using docker
 - Chromadb is also hosted on azure vm 16gb 2vcpu  using docker
 - Fastapi is hosted on azure vm 8gb 2vcpu using apache server for configuration
+- Frontend vite+react+typescript is deployed on vercel
 
 
 ## Kestra 
