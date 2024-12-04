@@ -16,6 +16,10 @@ This is the main source code repository for doc0, an AI-powered documentation ch
 - **Authentication** Google OAuth integration with request limiting for free users
 
 
+## Did not won wemakedevs Hackathon
+- Took all the servers downs there are costing too much
+- But i was a good experience 
+
 ## Youtube demo video 
 
 [![Doc0 Demo](https://img.youtube.com/vi/QgL8jfBxz9s/maxresdefault.jpg)](https://www.youtube.com/watch?v=QgL8jfBxz9s)
