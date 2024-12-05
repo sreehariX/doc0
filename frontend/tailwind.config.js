@@ -21,7 +21,7 @@ export default {
     },
   },
   plugins: [
-    require('@tailwindcss/typography'),
-    require('tailwind-scrollbar'),
+    import('@tailwindcss/typography'),
+    import('tailwind-scrollbar'),
   ],
 }
