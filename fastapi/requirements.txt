@@ -1,7 +1,5 @@
-
-pandas
-chromadb
+selenium
+chromadb==0.6.3
 fastapi
 uvicorn
-tiktoken
-google-generativeai
+google-genai
