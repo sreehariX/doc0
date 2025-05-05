@@ -4,12 +4,20 @@ import { Inter } from 'next/font/google';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Analytics } from '@vercel/analytics/next';
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({ 
+  subsets: ['latin'],
+  display: 'swap',
+  weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
+  variable: '--font-inter',
+});
 
 export const metadata: Metadata = {
-  title: 'Golem Documentation Search',
-  description: 'Search Golem documentation with semantic RAG search',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
+  title: 'Doc0 - Chat with Documentation Using AI',
+  description: 'Doc0 is the best way to interact with documentation using AI. Get answers faster with natural language conversations.',
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/apple-icon.png',
+  }
 };
 
 export default function RootLayout({
@@ -18,12 +26,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={inter.variable}>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+        <link rel="manifest" href="/site.webmanifest" />
+        <meta name="theme-color" content="#000000" />
       </head>
-      <body className={inter.className}>
+      <body className={`${inter.className} antialiased`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

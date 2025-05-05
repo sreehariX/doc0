@@ -1,743 +1,440 @@
 "use client";
 
-import { useState, useRef, useEffect } from 'react';
+import React from 'react';
+import Link from 'next/link';
+import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Sidebar } from '@/components/sidebar';
-import { MessageList } from '@/components/message-list';
-import { SummaryResults } from '@/components/summary-results';
-import { PanelLeftOpen, PanelLeftClose, MessageSquarePlus, Search, Menu, X } from 'lucide-react';
-import { Chat, Message, generateSyntheticResponse, generateChatTitle } from '@/lib/chat-store';
-import { SearchResult } from '@/lib/api-service';
-import { useSearchStore } from '@/lib/store';
+import { ArrowRight, MessageSquare, Search, Zap, Users, Home, Code } from 'lucide-react';
+import { AuroraBackground } from '@/components/ui/aurora-background';
+import { NavbarWrapper } from '@/components/ui/navbar-wrapper';
 
-import { chatStorageService } from '@/lib/chat-storage-service';
-import { SocialButtons } from '@/components/support-button';
-
-export default function Home() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [input, setInput] = useState('');
-  const [activeChat, setActiveChat] = useState<string | null>(null);
-  const [chats, setChats] = useState<Chat[]>([]);
-  const [isFirstMessage, setIsFirstMessage] = useState(true);
-  const messagesStartRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
-  
-  // Add a ref to track current request
-  const abortControllerRef = useRef<AbortController | null>(null);
-  
-  // Check if the screen is mobile size
-  const [isMobile, setIsMobile] = useState(false);
-
-  // Effect to handle responsive behavior
-  useEffect(() => {
-    const checkIfMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-      if (window.innerWidth < 768) {
-        setIsSidebarOpen(false);
-      }
-    };
-
-    // Initial check
-    checkIfMobile();
-
-    // Add event listener for window resize
-    window.addEventListener('resize', checkIfMobile);
-    
-    // Add event listener for custom sidebar close event
-    const handleCloseSidebar = () => {
-      setIsMobileSidebarOpen(false);
-    };
-    
-    window.addEventListener('closeMobileSidebar', handleCloseSidebar);
-
-    // Cleanup
-    return () => {
-      window.removeEventListener('resize', checkIfMobile);
-      window.removeEventListener('closeMobileSidebar', handleCloseSidebar);
-    };
-  }, []);
-
-  const { 
-    query, 
-    results, 
-    summary, 
-    isLoading, 
-    isSummarizing, 
-    setQuery, 
-    search, 
-    clearResults,
-    queryType,
-    setQueryType,
-    n_results,
-    setNResults,
-    enhancedQuery
-  } = useSearchStore();
-
-  // Initialize IndexedDB when the component mounts
-  useEffect(() => {
-    const initializeDB = async () => {
-      try {
-        console.log('Initializing IndexedDB...');
-        await chatStorageService.initializeDB();
-        console.log('IndexedDB initialized successfully');
-        
-        // Clean up chats older than 30 days
-        try {
-          await chatStorageService.cleanupOldChats();
-          console.log('Old chats cleanup completed');
-        } catch (cleanupError) {
-          console.error('Error cleaning up old chats:', cleanupError);
-        }
-      } catch (error) {
-        console.error('Error initializing IndexedDB:', error);
-      }
-    };
-    
-    initializeDB();
-  }, []);
-
-  // Load chats from storage on component mount
-  useEffect(() => {
-    const loadChats = async () => {
-      try {
-        console.log('Loading chats from storage...');
-        const storedChats = await chatStorageService.getAllChats();
-        
-        if (storedChats && storedChats.length > 0) {
-          console.log(`Loaded ${storedChats.length} chats from storage`);
-          
-          // Initialize each chat with an empty results array
-          const chatsWithEmptyResults = storedChats.map(chat => ({
-            ...chat,
-            results: [] // Initialize with empty results array
-          }));
-          
-          setChats(chatsWithEmptyResults);
-          
-          // Set the most recent chat as active
-          const sortedChats = [...chatsWithEmptyResults].sort((a, b) => {
-            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-          });
-          
-          if (sortedChats.length > 0) {
-            console.log(`Setting most recent chat as active: ${sortedChats[0].id}`);
-            setActiveChat(sortedChats[0].id);
-          }
-        } else {
-          console.log('No chats found in storage');
-        }
-      } catch (error) {
-        console.error('Error loading chats from storage:', error);
-      }
-    };
-    
-    loadChats();
-  }, []);
-
-  // Save chat to storage when chats change
-  useEffect(() => {
-    const saveChats = async () => {
-      if (chats.length > 0) {
-        for (const chat of chats) {
-          try {
-            // Skip saving if the chat doesn't have an ID or is incomplete
-            if (!chat.id || !chat.messages || chat.messages.length === 0) {
-              console.warn('Skipping save for incomplete chat:', chat);
-              continue;
-            }
-            
-           
-          } catch (error) {
-            console.error('Error saving chat:', error);
-          }
-        }
-      }
-    };
-    
-    saveChats();
-  }, [chats]);
-
-  // Scroll to top of messages when active chat changes
-  useEffect(() => {
-    if (messagesStartRef.current) {
-      messagesStartRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [activeChat]);
-
-  // Auto-resize textarea based on content
-  useEffect(() => {
-    const textarea = textareaRef.current;
-    if (textarea) {
-      textarea.style.height = 'auto';
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
-    }
-  }, [input]);
-
-  // Check if API key is configured
-  useEffect(() => {
-    if (!process.env.NEXT_PUBLIC_GOOGLE_GENERATIVE_AI_API_KEY) {
-      console.warn('Google Generative AI API key is not configured. Summary feature will not work.');
-    } else {
-      console.log('Google Generative AI API key is configured.');
-    }
-  }, []);
-
-  // Add a loading state for response generation
-  const [isGenerating, setIsGenerating] = useState(false);
-  // Add a lock to prevent multiple simultaneous requests
-  const [isRequestLocked, setIsRequestLocked] = useState(false);
-
-  const currentChat = chats.find(chat => chat.id === activeChat);
-
-  // Add a function to explicitly save the current chat
-  const saveCurrentChat = async (chatId: string) => {
-    if (!chatId) return;
-    
-    const chatToSave = chats.find(chat => chat.id === chatId);
-    if (chatToSave) {
-      try {
-        // Create a copy of the chat to avoid reference issues
-        const chatCopy = {
-          ...chatToSave,
-          messages: [...chatToSave.messages]
-        };
-        
-        await chatStorageService.saveChat(chatCopy);
-        console.log(`Explicitly saved chat: ${chatId} with ${chatCopy.messages.length} messages`);
-      } catch (error) {
-        console.error(`Error explicitly saving chat ${chatId}:`, error);
-      }
-    }
-  };
-
-  // Add a function to thoroughly clean up between chat switches
-  const forceCleanupCurrentChat = () => {
-    console.log('Performing thorough cleanup between chats');
-    
-    // Reset all search-related state
-    clearResults();
-    useSearchStore.getState().clearResults();
-    
-    // Reset UI states
-    setIsGenerating(false);
-    setIsRequestLocked(false);
-    
-    // Abort any pending requests
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    
-    // Clear input field
-    setInput('');
-  };
-
-  const handleSend = async () => {
-    if (!input.trim()) return;
-
-    try {
-        // Lock request to prevent multiple submissions
-        if (isRequestLocked) return;
-        setIsRequestLocked(true);
-        
-        // Create a new abort controller for this request
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-        }
-        abortControllerRef.current = new AbortController();
-        const signal = abortControllerRef.current.signal;
-        
-        // Reset any existing state first to prevent stale data
-        clearResults();
-        useSearchStore.getState().clearResults();
-        setIsGenerating(true);
-        
-        // Create user message
-        const userMessage: Message = {
-            id: crypto.randomUUID(),
-            role: 'user',
-            content: input,
-            timestamp: new Date()
-        };
-
-        // Find current chat or create new one
-        let currentChat = activeChat ? chats.find(chat => chat.id === activeChat) : null;
-        
-        if (!currentChat) {
-            currentChat = {
-                id: crypto.randomUUID(),
-                title: input.substring(0, 50) + "...",
-                createdAt: new Date(),
-                messages: [],
-                results: []
-            };
-            console.log('Created new chat:', currentChat.id);
-        }
-
-        // Store the input and clear it immediately for better UX
-        const queryInput = input;
-        setInput('');
-
-        // Create a fresh copy of messages to avoid state issues
-        const updatedMessages = [...currentChat.messages, userMessage];
-        const updatedChat = {
-            ...currentChat,
-            messages: updatedMessages,
-            results: [], // Reset results to prevent old data appearing
-            summary: '', // Reset summary
-            enhancedQuery: '' // Reset enhanced query
-        };
-
-        // Update chats state with user message - ensure we're creating new references
-        const updatedChats = activeChat
-            ? chats.map(chat => chat.id === activeChat ? updatedChat : {...chat})
-            : [updatedChat, ...chats];
-
-        setChats(updatedChats);
-        setActiveChat(updatedChat.id);
-
-        // Explicitly save the chat with just the user message
-        await chatStorageService.saveChat({...updatedChat});
-
-        // Trigger search and wait for results - use a timeout to ensure UI updates first
-        setTimeout(async () => {
-            try {
-                setQuery(queryInput);
-                await search();
-                
-                // Get the LATEST results after search is complete
-                const currentResults = useSearchStore.getState().results;
-                const currentSummary = useSearchStore.getState().summary;
-        
-                // Create assistant message with the actual results
-                const assistantMessage: Message = {
-                    id: crypto.randomUUID(),
-                    role: 'assistant',
-                    content: currentSummary || (currentResults.length > 0 ? generateFallbackFromResults(currentResults) : 'No results found.'),
-                    timestamp: new Date()
-                };
-        
-                // Update messages with assistant response - create fresh copies to avoid state issues
-                const finalMessages = [...updatedMessages, assistantMessage];
-                
-                const finalChat = {
-                    ...updatedChat,
-                    messages: finalMessages,
-                    results: [...currentResults] // Create a fresh copy
-                };
-        
-                // Update chats state with assistant message
-                setChats(prev => {
-                    const finalChats = prev.map(chat => 
-                        chat.id === updatedChat.id ? finalChat : chat
-                    );
-                    return finalChats;
-                });
-                
-                // Save chat with complete messages
-                console.log('Saving chat with all messages:', {
-                    chatId: finalChat.id,
-                    messageCount: finalChat.messages.length,
-                    lastMessage: finalChat.messages[finalChat.messages.length - 1].content.substring(0, 50) + '...'
-                });
-        
-                await chatStorageService.saveChat({...finalChat});
-                
-                // End loading states
-                setIsGenerating(false);
-                setIsRequestLocked(false);
-
-                if (isFirstMessage) {
-                    setIsFirstMessage(false);
-                }
-            } catch (searchError) {
-                console.error('Error during search:', searchError);
-                
-                // If search fails, add an error message
-                const errorMessage: Message = {
-                    id: crypto.randomUUID(),
-                    role: 'assistant',
-                    content: 'Sorry, there was an error processing your query. Please try again.',
-                    timestamp: new Date()
-                };
-                
-                const finalErrorMessages = [...updatedMessages, errorMessage];
-                
-                const errorChat = {
-                    ...updatedChat,
-                    messages: finalErrorMessages
-                };
-                
-                // Update chats state with error message
-                setChats(prev => {
-                    const errorChats = prev.map(chat => 
-                        chat.id === updatedChat.id ? errorChat : chat
-                    );
-                    return errorChats;
-                });
-                
-                await chatStorageService.saveChat({...errorChat});
-                
-                // End loading states
-                setIsGenerating(false);
-                setIsRequestLocked(false);
-            }
-        }, 0);
-    } catch (error) {
-        console.error('Error in handleSend:', error);
-        setIsGenerating(false);
-        setIsRequestLocked(false);
-    }
+// Animation variants
+const fadeInUp = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: { duration: 0.6 }
+  }
 };
 
-  // Helper function to generate a fallback response directly from results
-  function generateFallbackFromResults(results: SearchResult[]): string {
-    if (!results || results.length === 0) {
-      return 'Sorry, no documentation matches your query. Please try with different keywords.';
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
     }
-    
-    let fallback = `# Golem Documentation Search Results\n\n`;
-    
-    // Add notification about results
-    fallback += `> Found ${results.length} matching documents in the Golem documentation.\n\n`;
-    
-    // Create a references section for all URLs
-    let references = `## References\n\n`;
-    
-    results.forEach((result, index) => {
-      const score = (result.similarity_score * 100).toFixed(1);
-      fallback += `## ${index + 1}. ${result.metadata.title} (${score}% match) [[${index + 1}]](#reference-${index + 1})\n\n`;
-      
-      fallback += `- **Version**: ${result.metadata.version_or_commonresource}\n`;
-      fallback += `- **Source**: [View Documentation [${index + 1}]](${result.metadata.url})\n\n`;
-      
-      // Add document content directly
-      fallback += `### Content\n\n`;
-      fallback += `${result.document}\n\n`;
-      
-      fallback += `---\n\n`;
-      
-      // Add to references section
-      references += `<div id="reference-${index + 1}" class="reference-item">\n`;
-      references += `[${index + 1}] <a href="${result.metadata.url}" target="_blank" rel="noopener noreferrer">${result.metadata.url}</a>\n`;
-      references += `</div>\n\n`;
-    });
-    
-    // Append references section at the end
-    fallback += `\n${references}`;
-    
-    return fallback;
   }
+};
 
-  // Use the cleanup in both handleNewChat and handleSelectChat
-  const handleNewChat = () => {
-    // Prevent creating new chat during an active request
-    if (isRequestLocked) return;
-    
-    // Perform thorough cleanup
-    forceCleanupCurrentChat();
-    
-    setActiveChat(null);
-    setIsFirstMessage(true);
-  };
+const item = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.3 }
+  }
+};
 
-  const handleSelectChat = async (id: string) => {
-    try {
-        console.log(`Selecting chat: ${id}`);
-        
-        // Perform thorough cleanup first
-        forceCleanupCurrentChat();
-        
-        // Load the chat from storage
-        const loadedChat = await chatStorageService.getChat(id);
-        
-        if (loadedChat) {
-            console.log(`Loaded chat ${id} with ${loadedChat.messages.length} messages`);
-            
-            // Ensure the zustand store is completely reset
-            useSearchStore.getState().clearResults();
-            
-            // Important: create deep copies of the chat data to avoid reference issues
-            const cleanLoadedChat = JSON.parse(JSON.stringify(loadedChat));
-            cleanLoadedChat.results = cleanLoadedChat.results || [];
-            
-            // Update the chat in the chats array, ensuring we're not sharing references
-            setChats(prev => {
-                // Create a fresh copy of the entire chats array
-                const updatedChats = prev.map(chat => 
-                    chat.id === id ? cleanLoadedChat : {...chat, messages: [...chat.messages]}
-                );
-                return updatedChats;
-            });
-            
-            // Set as active chat - do this AFTER state is fully reset
-            setTimeout(() => {
-                setActiveChat(id);
-            }, 0);
-            
-            // Clear input
-            setInput('');
-        } else {
-            console.error(`Could not load chat ${id}`);
-        }
-    } catch (error) {
-        console.error(`Error selecting chat ${id}:`, error);
-    }
-  };
-
-  const handleDeleteChat = async (chatId: string) => {
-    // Prevent deleting chat during an active request
-    if (isRequestLocked) return;
-    
-    try {
-      await chatStorageService.deleteChat(chatId);
-      setChats(prev => prev.filter(chat => chat.id !== chatId));
-      if (activeChat === chatId) {
-        setActiveChat(null);
-        setIsFirstMessage(true);
-        
-        // Clear the search results with a small delay to prevent UI flicker
-        setTimeout(() => {
-          clearResults();
-        }, 50);
-      }
-    } catch (error) {
-      console.error('Error deleting chat:', error);
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      clearResults();
-    };
-  }, []);
-
-  // Save active chat to storage when it changes
-  useEffect(() => {
-    if (!activeChat) return;
-    
-    // Find the current active chat
-    const currentChat = chats.find(chat => chat.id === activeChat);
-    if (!currentChat) {
-      console.log(`Active chat ${activeChat} not found in chats array`);
-      return;
-    }
-    
-    console.log(`Active chat changed: ${activeChat}, messages: ${currentChat.messages.length}`);
-    
-    
-  }, [activeChat, chats]);
-
+export default function HomePage() {
   return (
-    <div className="flex h-screen relative" style={{ backgroundColor: 'var(--background)' }}>
-      {/* Mobile sidebar overlay */}
-      {isMobileSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-20 md:hidden"
-          onClick={() => setIsMobileSidebarOpen(false)}
-        />
-      )}
-      
-      {/* Sidebar - desktop version uses isSidebarOpen, mobile version uses isMobileSidebarOpen */}
-      <div className={`${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 fixed md:relative z-30 transition-transform duration-300 ease-in-out h-full`}>
-        <Sidebar 
-          isOpen={isMobile ? true : isSidebarOpen}
-          chats={chats}
-          activeChat={activeChat}
-          onNewChat={handleNewChat}
-          onSelectChat={(id) => {
-            handleSelectChat(id);
-            if (isMobile) setIsMobileSidebarOpen(false);
-          }}
-          onDeleteChat={handleDeleteChat}
-        />
-      </div>
-      
-      <div className={`flex-1 flex flex-col w-full ${!isSidebarOpen ? 'md:max-w-5xl md:mx-auto' : ''}`}>
-        <div className="h-14 flex items-center px-4 justify-between">
-          <div className="flex items-center gap-2">
-            {/* Mobile menu button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsMobileSidebarOpen(true)}
-              className="text-white hover:bg-[var(--button-ghost-hover)] rounded-full md:hidden"
+    <AuroraBackground>
+      <NavbarWrapper>
+        {/* Main Content with proper padding for the fixed navbar */}
+        <div className="pt-16">
+          {/* Hero Section */}
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
+            <motion.h1 
+              initial="hidden"
+              animate="visible"
+              variants={fadeInUp}
+              className="text-5xl md:text-7xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-white to-gray-400 leading-tight"
             >
-              <Menu />
-            </Button>
-            
-            {/* Desktop sidebar toggle */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="text-white hover:bg-[var(--button-ghost-hover)] rounded-full hidden md:flex"
+              <span className="text-white">Stop</span> Searching.<br/>
+              <span className="text-white">Start</span> Conversing.
+            </motion.h1>
+            <motion.p 
+              initial="hidden"
+              animate="visible"
+              variants={fadeInUp}
+              transition={{ delay: 0.1 }}
+              className="mt-8 text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto font-light leading-relaxed"
             >
-              {isSidebarOpen ? <PanelLeftClose /> : <PanelLeftOpen />}
-            </Button>
-            
-            {!isSidebarOpen && !isMobile && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleNewChat}
-                className="text-white hover:bg-[var(--button-ghost-hover)] rounded-full hidden md:flex"
-              >
-                <MessageSquarePlus className="h-5 w-5" />
-              </Button>
-            )}
+              Doc0 transforms your documentation into intelligent conversations. Get precise answers instantly, without endless scrolling.
+            </motion.p>
+            <motion.div 
+              initial="hidden"
+              animate="visible"
+              variants={fadeInUp}
+              transition={{ delay: 0.2 }}
+              className="mt-12 flex flex-col sm:flex-row gap-6 justify-center"
+            >
+              <Link href="/chat">
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Button className="bg-white text-black hover:bg-gray-200 px-8 py-7 text-lg inline-flex items-center font-medium shadow-lg rounded-full">
+                    Experience it Now
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </motion.div>
+              </Link>
+              <Link href="/features">
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Button variant="outline" className="border-gray-600 text-white hover:bg-zinc-800 px-8 py-7 text-lg font-medium rounded-full">
+                    Explore Features
+                  </Button>
+                </motion.div>
+              </Link>
+            </motion.div>
           </div>
-          
-          {currentChat && (
-            <h2 className="ml-4 font-semibold truncate text-white flex-1 text-center md:text-left">
-              {currentChat.title}
-            </h2>
-          )}
-          
-          <div className="flex items-center gap-2">
-            {/* Social media buttons - desktop only */}
-            <div className="hidden md:flex">
-              <SocialButtons />
-            </div>
-            
-            {/* Mobile new chat button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleNewChat}
-              className="text-white hover:bg-[var(--button-ghost-hover)] rounded-full md:hidden"
+
+          {/* Chat Interface - Updated to look like the second image */}
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative mb-20">
+            <motion.div 
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.3 }}
+              className="w-full bg-zinc-900/70 backdrop-blur-sm rounded-2xl overflow-hidden shadow-2xl border border-gray-800"
             >
-              <MessageSquarePlus className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
-
-        <div 
-          ref={messagesContainerRef}
-          className="flex-1 overflow-y-auto" 
-          style={{ backgroundColor: 'var(--background)' }}
-        >
-          <div ref={messagesStartRef} className="pt-4" />
-          <MessageList 
-            messages={currentChat?.messages || []} 
-            isGenerating={isGenerating}
-          />
-          
-          {/* Only show SummaryResults when actively generating a response */}
-          {activeChat && isGenerating && (
-            <div className="max-w-3xl mx-auto px-4 pb-6">
-              <SummaryResults 
-                currentChat={currentChat}
-              />
-            </div>
-          )}
-        </div>
-
-        <div className={`p-3 md:p-6 ${isFirstMessage ? 'flex items-center justify-center h-32' : ''}`}>
-          <div className="max-w-3xl w-full mx-auto relative">
-            {enhancedQuery && (
-              <div className="text-xs text-gray-300 mb-2 ml-2">
-                <span className="font-semibold">Enhanced query:</span> {enhancedQuery}
+              <div className="h-14 bg-black/80 flex items-center px-6 justify-between rounded-t-2xl">
+                <div className="flex items-center">
+                  <div className="flex space-x-2 mr-4">
+                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                  </div>
+                  <div className="text-lg font-bold text-white ml-2">Doc<span className="text-blue-500">0</span></div>
+                </div>
+                <div className="text-sm text-gray-400">how can i deploy golem ?</div>
+                <div className="flex space-x-3">
+                  <div className="text-gray-400 cursor-pointer hover:text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+                    </svg>
+                  </div>
+                  <div className="text-gray-400 cursor-pointer hover:text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                    </svg>
+                  </div>
+                  <div className="text-gray-400 cursor-pointer hover:text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" />
+                    </svg>
+                  </div>
+                </div>
               </div>
-            )}
-            <div className="relative rounded-2xl bg-[rgba(50,50,50,0.6)] border border-[rgba(255,255,255,0.1)] focus-within:border-[rgba(255,255,255,0.3)] focus-within:shadow-glow transition-all duration-200">
-              <textarea
-                ref={textareaRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Search Golem documentation..."
-                className="w-full py-4 px-5 text-white bg-transparent rounded-2xl resize-none"
-                style={{
-                  minHeight: isMobile ? '80px' : '70px',
-                  maxHeight: '150px',
-                  outline: 'none',
-                  lineHeight: '1.5',
-                  paddingBottom: isMobile ? '40px' : '50px'
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
+              <div className="flex h-[750px]">
+                {/* Left sidebar */}
+                <div className="w-64 bg-zinc-950/80 border-r border-gray-800 p-4 hidden md:block">
+                  <div className="mb-4 flex items-center justify-between">
+                    <button className="bg-zinc-800 hover:bg-zinc-700 text-white py-2 px-4 rounded-xl text-sm flex items-center gap-2 transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 5v14M5 12h14" />
+                      </svg>
+                      New Chat
+                    </button>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-gray-400 mb-2">RECENT CHATS</div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center p-2 rounded-xl text-sm bg-transparent text-white hover:bg-zinc-800 cursor-pointer group border-l-2 border-blue-500 pl-3">
+                        <div className="truncate">how can i deploy golem ?</div>
+                        <button className="text-gray-500 opacity-0 group-hover:opacity-100">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                          </svg>
+                        </button>
+                      </div>
+                      <div className="p-2 rounded-xl text-sm hover:bg-zinc-800 cursor-pointer text-gray-300">
+                        How to install Golem
+                      </div>
+                      <div className="p-2 rounded-xl text-sm hover:bg-zinc-800 cursor-pointer text-gray-300">
+                        API authentication
+                      </div>
+                      <div className="p-2 rounded-xl text-sm hover:bg-zinc-800 cursor-pointer text-gray-300">
+                        Component deployment
+                      </div>
+                      <div className="p-2 rounded-xl text-sm hover:bg-zinc-800 cursor-pointer text-gray-300">
+                        Troubleshooting workers
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Main content */}
+                <div className="flex-1 flex flex-col overflow-hidden bg-zinc-950">
+                  <div className="flex-1 overflow-y-auto p-8 space-y-8">
+                    <div className="flex justify-end">
+                      <div className="inline-block rounded-xl bg-zinc-800/80 px-5 py-3 max-w-[80%]">
+                        <p className="text-white">how can i deploy golem ?</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start space-x-4">
+                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center">
+                        <MessageSquare className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="bg-zinc-800/60 rounded-xl p-6">
+                          <p className="text-white mb-5 text-lg">You can deploy Golem in a few ways:</p>
+                          
+                          <ol className="space-y-6 text-gray-200">
+                            <li className="flex gap-3">
+                              <span className="font-bold text-lg">1.</span>
+                              <div>
+                                <div className="font-bold text-lg">Golem Cloud:</div>
+                                <p className="mt-1">This is a hosted version of Golem, which is the easiest and fastest way to run Golem workers at scale without infrastructure setup or maintenance. It can be managed via the web management console, <code className="bg-black/40 px-1.5 py-0.5 rounded-md text-gray-300">golem-cloud-cli</code>, or REST API.</p>
+                              </div>
+                            </li>
+                            
+                            <li className="flex gap-3">
+                              <span className="font-bold text-lg">2.</span>
+                              <div>
+                                <div className="font-bold text-lg">Kubernetes:</div>
+                                <p className="mt-1">You can deploy to Kubernetes using the Golem Helm Chart. You'll need Helm and <code className="bg-black/40 px-1.5 py-0.5 rounded-md text-gray-300">kubectl</code> installed locally, and a running Kubernetes cluster. A quick start method involves downloading the contents of the <code className="bg-black/40 px-1.5 py-0.5 rounded-md text-gray-300">kube</code> directory from the Golem repository and running the <code className="bg-black/40 px-1.5 py-0.5 rounded-md text-gray-300">deploy.sh</code> script.</p>
+                              </div>
+                            </li>
+                          </ol>
+
+                          <div className="mt-6 p-4 bg-black/30 rounded-xl border border-gray-700 font-mono text-sm text-gray-300">
+                            <pre className="whitespace-pre-wrap">./deploy.sh -n golem</pre>
+                          </div>
+                          
+                          <p className="mt-5 text-gray-200">
+                            This will deploy Golem with Redis and PostgreSQL to the <code className="bg-black/40 px-1.5 py-0.5 rounded-md text-gray-300">golem</code> namespace.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="p-5 border-t border-gray-800 bg-zinc-900/50">
+                    <div className="relative">
+                      <input 
+                        type="text" 
+                        placeholder="Search documentation..."
+                        className="w-full bg-zinc-800/50 border border-gray-700 rounded-xl py-3.5 pl-5 pr-12 focus:outline-none focus:ring-2 focus:ring-white text-white"
+                      />
+                      <button className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white">
+                        <Search className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Features Section */}
+          <div id="features" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32">
+            <motion.div 
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeInUp}
+              className="text-center mb-20"
+            >
+              <h2 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-300">Why Teams Love Doc0</h2>
+              <p className="mt-6 text-xl text-gray-300 max-w-3xl mx-auto font-light leading-relaxed">
+                Stop wasting hours searching through documentation. Our AI understands context and delivers exactly what you need.
+              </p>
+            </motion.div>
+            
+            <motion.div 
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={staggerContainer}
+              className="grid grid-cols-1 md:grid-cols-3 gap-10"
+            >
+              <motion.div 
+                variants={item}
+                whileHover={{ y: -10 }}
+                className="bg-zinc-900/50 backdrop-blur-sm p-8 rounded-xl border border-gray-800"
+              >
+                <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center mb-6">
+                  <MessageSquare className="w-6 h-6 text-black" />
+                </div>
+                <h3 className="text-xl font-semibold mb-4">Natural Conversations</h3>
+                <p className="text-gray-300 leading-relaxed">
+                  Chat with your documentation in natural language. Ask questions, get clarifications, and dive deeper without browsing through pages.
+                </p>
+              </motion.div>
+              
+              <motion.div 
+                variants={item}
+                whileHover={{ y: -10 }}
+                className="bg-zinc-900/50 backdrop-blur-sm p-8 rounded-xl border border-gray-800"
+              >
+                <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center mb-6">
+                  <Search className="w-6 h-6 text-black" />
+                </div>
+                <h3 className="text-xl font-semibold mb-4">Semantic Search</h3>
+                <p className="text-gray-300 leading-relaxed">
+                  Powered by advanced vector search and AI, Doc0 understands what you're looking for, not just matching keywords.
+                </p>
+              </motion.div>
+              
+              <motion.div 
+                variants={item}
+                whileHover={{ y: -10 }}
+                className="bg-zinc-900/50 backdrop-blur-sm p-8 rounded-xl border border-gray-800"
+              >
+                <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center mb-6">
+                  <Zap className="w-6 h-6 text-black" />
+                </div>
+                <h3 className="text-xl font-semibold mb-4">Lightning Fast</h3>
+                <p className="text-gray-300 leading-relaxed">
+                  Get answers in seconds, not minutes. Stop wasting time scrolling through endless documentation pages.
+                </p>
+              </motion.div>
+            </motion.div>
+
+            <motion.div 
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeInUp}
+              className="mt-16 text-center"
+            >
+              <Link href="/chat">
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Button className="bg-white text-black hover:bg-gray-200 px-8 py-3 text-lg inline-flex items-center rounded-full">
+                    Try It Now
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </motion.div>
+              </Link>
+            </motion.div>
+          </div>
+
+          {/* Testimonials */}
+          <div className="py-32 bg-black/40 backdrop-blur-sm">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <motion.div 
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                variants={fadeInUp}
+                className="text-center mb-20"
+              >
+                <h2 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-300">Loved by Developers</h2>
+                <p className="mt-6 text-xl text-gray-300 font-light leading-relaxed max-w-2xl mx-auto">
+                  Join thousands of developers who have revolutionized their workflow with Doc0.
+                </p>
+              </motion.div>
+              
+              <motion.div 
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                variants={staggerContainer}
+                className="grid grid-cols-1 md:grid-cols-3 gap-8"
+              >
+                {[
+                  {
+                    quote: "Doc0 is at least a 2x improvement over traditional documentation search. It's an incredible accelerator for me and my team.",
+                    author: "Ben Bernard",
+                    role: "Senior Engineer, Acme Inc"
+                  },
+                  {
+                    quote: "The way Doc0 understands context and provides relevant information is magical. I can't imagine going back to regular docs.",
+                    author: "Sarah Johnson",
+                    role: "Tech Lead, FutureTech"
+                  },
+                  {
+                    quote: "I love how Doc0 remembers our conversation context. I can ask follow-up questions without repeating myself. Game changer!",
+                    author: "Alex Rodriguez",
+                    role: "Developer Advocate, BuildCo"
                   }
-                }}
-              />
-              
-              {/* Mobile controls */}
-              <div className="md:hidden absolute bottom-3 left-3 right-14 flex flex-row items-center space-x-2">
-                <div className="flex items-center">
-                  <label htmlFor="queryType-mobile" className="text-[10px] font-medium text-gray-300 mr-1 mobile-label">Type:</label>
-                  <select 
-                    id="queryType-mobile"
-                    value={queryType}
-                    onChange={(e) => setQueryType(e.target.value as 'enhanced' | 'raw')}
-                    className="bg-[rgba(60,60,60,0.6)] text-white text-[10px] rounded-md px-1 py-1 border border-[rgba(255,255,255,0.1)] w-[80px] mobile-select"
+                ].map((testimonial, i) => (
+                  <motion.div 
+                    key={i} 
+                    variants={item}
+                    whileHover={{ y: -10 }}
+                    className="bg-zinc-900/50 backdrop-blur-sm p-8 rounded-xl border border-gray-800"
                   >
-                    <option value="enhanced">Enhanced</option>
-                    <option value="raw">Raw</option>
-                  </select>
-                </div>
-                <div className="flex items-center">
-                  <label htmlFor="n_results-mobile" className="text-[10px] font-medium text-gray-300 mr-1 mobile-label">Results:</label>
-                  <select 
-                    id="n_results-mobile"
-                    value={n_results}
-                    onChange={(e) => setNResults(Number(e.target.value))}
-                    className="bg-[rgba(60,60,60,0.6)] text-white text-[10px] rounded-md px-1 py-1 border border-[rgba(255,255,255,0.1)] w-[50px] mobile-select"
-                  >
-                    <option value="5">5</option>
-                    <option value="10">10</option>
-                    <option value="15">15</option>
-                    <option value="20">20</option>
-                  </select>
-                </div>
-              </div>
-              
-              {/* Desktop controls */}
-              <div className="absolute bottom-3 left-5 hidden md:flex md:flex-row md:items-center md:space-x-4">
-                <div className="flex items-center space-x-2">
-                  <label htmlFor="queryType" className="text-sm font-medium text-gray-300">Query Type:</label>
-                  <select 
-                    id="queryType"
-                    value={queryType}
-                    onChange={(e) => setQueryType(e.target.value as 'enhanced' | 'raw')}
-                    className="bg-[rgba(60,60,60,0.6)] text-white text-sm rounded-md px-3 py-1.5 border border-[rgba(255,255,255,0.1)]"
-                  >
-                    <option value="enhanced">Enhanced Query</option>
-                    <option value="raw">Raw Query</option>
-                  </select>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <label htmlFor="n_results" className="text-sm font-medium text-gray-300">Results:</label>
-                  <select 
-                    id="n_results"
-                    value={n_results}
-                    onChange={(e) => setNResults(Number(e.target.value))}
-                    className="bg-[rgba(60,60,60,0.6)] text-white text-sm rounded-md px-3 py-1.5 border border-[rgba(255,255,255,0.1)]"
-                  >
-                    <option value="5">5</option>
-                    <option value="10">10</option>
-                    <option value="15">15</option>
-                    <option value="20">20</option>
-                  </select>
-                </div>
-              </div>
-              
-              <Button
-                className="absolute right-3 md:right-4 bottom-3 h-10 w-10 md:h-11 md:w-11 p-0 rounded-full flex items-center justify-center bg-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.25)] transition-colors shadow-glow"
-                onClick={handleSend}
-                disabled={!input.trim()}
-              >
-                <Search className="h-5 w-5 text-white" />
-              </Button>
-            </div>
-            <div className="text-xs text-gray-400 mt-2 ml-2">
-              Press Enter to search, Shift+Enter for new line
+                    <p className="text-gray-300 italic mb-6 leading-relaxed">"{testimonial.quote}"</p>
+                    <div className="flex items-center">
+                      <div className="w-10 h-10 rounded-full bg-white"></div>
+                      <div className="ml-4">
+                        <p className="font-medium">{testimonial.author}</p>
+                        <p className="text-sm text-gray-400">{testimonial.role}</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </motion.div>
             </div>
           </div>
+                  
+          {/* CTA Section */}
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-32">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.7 }}
+              viewport={{ once: true }}
+              className="bg-zinc-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-12 md:p-16 text-center"
+            >
+              <h2 className="text-3xl md:text-5xl font-bold text-white mb-8 leading-tight">Ready to transform your<br/> documentation experience?</h2>
+              <p className="text-xl text-gray-300 mb-12 max-w-3xl mx-auto font-light leading-relaxed">
+                Join forward-thinking teams that have made Doc0 an essential part of their workflow. Get started in minutes, not days.
+              </p>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="inline-block">
+                <Link href="/chat" className="inline-flex items-center justify-center px-10 py-5 border border-transparent text-lg font-medium rounded-full text-black bg-white hover:bg-gray-200 transition-colors shadow-lg">
+                  Try for Free — No Credit Card
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
+              </motion.div>
+            </motion.div>
+          </div>
+                  
+          {/* Footer */}
+          <footer className="py-12 border-t border-gray-800/50 bg-black/30 backdrop-blur-sm">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Product</h3>
+                  <ul className="space-y-2">
+                    <li><Link href="/features" className="text-gray-400 hover:text-white">Features</Link></li>
+                    <li><Link href="/pricing" className="text-gray-400 hover:text-white">Pricing</Link></li>
+                    <li><Link href="/chat" className="text-gray-400 hover:text-white">Try Doc0</Link></li>
+                  </ul>
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Resources</h3>
+                  <ul className="space-y-2">
+                    <li><Link href="/docs" className="text-gray-400 hover:text-white">Documentation</Link></li>
+                    <li><Link href="/blog" className="text-gray-400 hover:text-white">Blog</Link></li>
+                    <li><Link href="/support" className="text-gray-400 hover:text-white">Support</Link></li>
+                  </ul>
+                </div>
+                
+                <div className="col-span-2 md:col-span-1">
+                  <h3 className="text-lg font-semibold mb-4">Connect</h3>
+                  <ul className="space-y-2">
+                    <li><Link href="https://twitter.com/doc0ai" className="text-gray-400 hover:text-white">Twitter</Link></li>
+                    <li><Link href="https://github.com/doc0ai" className="text-gray-400 hover:text-white">GitHub</Link></li>
+                    <li><Link href="mailto:hello@doc0.ai" className="text-gray-400 hover:text-white">Contact</Link></li>
+                  </ul>
+                </div>
+              </div>
+              
+              <div className="mt-12 pt-8 border-t border-gray-800/50 flex flex-col md:flex-row items-center justify-between">
+                <div className="flex items-center">
+                  <h2 className="text-2xl font-bold text-white">Doc<span className="text-gray-400">0</span></h2>
+                </div>
+                <p className="mt-4 md:mt-0 text-gray-400 text-sm">
+                  © {new Date().getFullYear()} Doc0. All rights reserved.
+                </p>
+              </div>
+            </div>
+          </footer>
         </div>
-      </div>
-    </div>
+      </NavbarWrapper>
+    </AuroraBackground>
   );
 }

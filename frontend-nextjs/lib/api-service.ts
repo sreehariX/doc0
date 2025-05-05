@@ -26,15 +26,14 @@ export async function searchDocumentation(
   include_resources: boolean = true
 ): Promise<SearchResponse> {
   try {
-    const response = await fetch('http://localhost:8000/query', {
+    const response = await fetch('https://api-doc0-qne28.ondigitalocean.app/query', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ 
         query, 
-        n_results, 
-        include_resources 
+        n_results 
       }),
     });
 

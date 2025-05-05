@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  --background: #1D1E1A;
-  --gradient-bg: #222325;
+  --background: #0c0c0c;
+  --gradient-bg: #131313;
   --button-ghost-hover: rgba(255, 255, 255, 0.1);
   --button-secondary: rgba(255, 255, 255, 0.12);
   --button-secondary-hover: rgba(255, 255, 255, 0.2);
@@ -25,12 +25,37 @@
   --color-silver: 0 0% 90%;
   --color-steel: 0 0% 60%;
   --color-dove: 0 0% 80%;
+  
+  /* Font weights */
+  --font-thin: 100;
+  --font-extralight: 200;
+  --font-light: 300;
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+  --font-extrabold: 800;
+  --font-black: 900;
 }
 
 @layer base {
   body {
     background-color: var(--background);
     color: white;
+    font-feature-settings: "ss01", "ss02", "cv01", "cv02";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: var(--font-bold);
+    letter-spacing: -0.025em;
+    line-height: 1.1;
+  }
+  
+  p, li {
+    font-weight: var(--font-normal);
+    line-height: 1.6;
   }
   
   textarea {
@@ -42,6 +67,24 @@
   textarea:focus {
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
     border-color: rgba(255, 255, 255, 0.3);
+  }
+}
+
+@layer components {
+  .font-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-b from-white to-gray-400;
+  }
+  
+  .glass-panel {
+    @apply bg-zinc-900/70 backdrop-blur-sm border border-gray-800 rounded-xl;
+  }
+  
+  .btn-primary {
+    @apply bg-white text-black hover:bg-gray-200 rounded-xl;
+  }
+  
+  .btn-secondary {
+    @apply bg-zinc-800 text-white hover:bg-zinc-700 border border-gray-700 rounded-xl;
   }
 }
 
@@ -247,37 +290,34 @@
 @media (max-width: 768px) {
   button, 
   select, 
-  input[type="button"], 
-  input[type="submit"] {
-    min-height: 44px;
-    min-width: 44px;
-  }
-  
-  .touch-target {
-    min-height: 44px;
-    min-width: 44px;
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"] {
+    font-size: 16px;
   }
 }
 
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
 
 @media (max-width: 768px) {
   input, 
-  select, 
   textarea {
     font-size: 16px;
   }
 }
 
-
 html, body {
-  -webkit-overflow-scrolling: touch;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
 }
 
-/* Prevent horizontal overflow */
 .overflow-x-hidden {
   overflow-x: hidden;
 }
 
 body {
-  overflow-x: hidden;
+  @apply bg-zinc-950;
 }
