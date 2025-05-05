@@ -195,7 +195,7 @@ def load_golem_docs_to_chroma(yaml_path: str):
 @app.on_event("startup")
 async def startup_db_client():
     try:
-        yaml_path = "../Scrappers/scrapper_to_yaml/golem_docs.yaml"
+        yaml_path = "golem_docs.yaml"
         if os.path.exists(yaml_path):
             load_golem_docs_to_chroma(yaml_path)
         else:
