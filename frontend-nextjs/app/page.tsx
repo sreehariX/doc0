@@ -404,21 +404,14 @@ export default function HomePage() {
                   </ul>
                 </div>
                 
-                <div>
-                  <h3 className="text-lg font-semibold mb-4">Resources</h3>
-                  <ul className="space-y-2">
-                    <li><Link href="/docs" className="text-gray-400 hover:text-white">Documentation</Link></li>
-                    <li><Link href="/blog" className="text-gray-400 hover:text-white">Blog</Link></li>
-                    <li><Link href="/support" className="text-gray-400 hover:text-white">Support</Link></li>
-                  </ul>
-                </div>
+               
                 
                 <div className="col-span-2 md:col-span-1">
                   <h3 className="text-lg font-semibold mb-4">Connect</h3>
                   <ul className="space-y-2">
-                    <li><Link href="https://twitter.com/doc0ai" className="text-gray-400 hover:text-white">Twitter</Link></li>
-                    <li><Link href="https://github.com/doc0ai" className="text-gray-400 hover:text-white">GitHub</Link></li>
-                    <li><Link href="mailto:hello@doc0.ai" className="text-gray-400 hover:text-white">Contact</Link></li>
+                    <li><Link href="https://x.com/sreehariX" className="text-gray-400 hover:text-white">Twitter</Link></li>
+                    <li><Link href="https://github.com/sreehariX" className="text-gray-400 hover:text-white">GitHub</Link></li>
+                    <li><Link href="sreeharixe@gmail.com" className="text-gray-400 hover:text-white">Contact</Link></li>
                   </ul>
                 </div>
               </div>
